@@ -1,20 +1,19 @@
 // ==UserScript==
 // @name            Pinterest help
-// @description     Display number pin in homefeed.
-// @description:vi  Hiển thị số pin ra ngoài trang chủ.
+// @description     Display the pin number outside the homepage, requires a business account.
+// @description:vi  Hiển thị số pin ra ngoài trang chủ, yêu cầu tài khoản doanh nghiệp.
 // @namespace       https://hhoangg.github.io
-// @match           https://www.pinterest.*/*/*
+// @match           https://*.pinterest.*/*
 // @icon            https://i.imgur.com/7jSswHh.png
 // @grant           none
 // @version         1.1
 // @author          hhoangg
-// @supportURL      https://github.com/hhoangg
+// @supportURL      https://github.com/hhoangg/Usercript/issues
 // @run-at          document-idle
 // @grant           GM.xmlHttpRequest
 // @grant           GM_xmlhttpRequest
 // ==/UserScript==
 
-/* global shortcut, sha256 */
 (function() {
   'use strict';
 
