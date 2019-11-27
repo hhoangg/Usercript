@@ -4,6 +4,7 @@
 // @description:vi  Hiển thị số pin ra ngoài trang chủ.
 // @namespace       https://hhoangg.github.io
 // @match           https://www.pinterest.*/*/*
+// @icon            https://i.imgur.com/7jSswHh.png
 // @grant           none
 // @version         1.1
 // @author          hhoangg
