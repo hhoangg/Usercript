@@ -4,9 +4,10 @@
 // @description:vi  Hiển thị số pin ra ngoài trang chủ, yêu cầu tài khoản doanh nghiệp.
 // @namespace       https://hhoangg.github.io
 // @match           https://*.pinterest.*/*
+// @match           https://www.pinterest.co.uk/*
 // @icon            https://i.imgur.com/7jSswHh.png
 // @grant           none
-// @version         1.1
+// @version         1.3
 // @author          hhoangg
 // @supportURL      https://github.com/hhoangg/Usercript/issues
 // @run-at          document-idle
