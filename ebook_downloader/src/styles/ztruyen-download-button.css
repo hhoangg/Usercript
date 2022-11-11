@@ -1,0 +1,33 @@
+.azh-theme-dark {
+  --primary: #d8baf0;
+  --success: #baf0c6;
+  --bg: #2c3436;
+  --bg-progress: #71777d;
+  display: inline-flex;
+}
+/* Button */
+.azh-btn-download {
+  color: #ffc008;
+  border-radius: 20px;
+  padding: 8.5px 50px;
+  margin-left: 0.5rem;
+  width: auto;
+}
+
+.azh-btn-download:hover{
+  background-color: #71777d;
+}
+
+.azh-btn-download[disabled] {
+  cursor: not-allowed;
+}
+.azh-download-text {
+  padding: unset;
+}
+.azh-download-progress {
+  background: linear-gradient(90deg, rgba(44, 52, 54, 1) 0%, rgba(9, 121, 70, 1) 49%, rgba(0, 255, 151, 1) 100%);
+}
+/* Button Complete */
+.azh-download-completed {
+  color: var(--success);
+}
