@@ -133,7 +133,6 @@ class BaseModel {
         this._updateBtnText('compressing ' + metadata.percent.toFixed(2) + '%');
       })
       .then((epubZipContent) => {
-        window.open(URL.createObjectURL(epubZipContent));
         saveAs(epubZipContent, this.ebookFilename);
       })
       .catch(function (err) {
