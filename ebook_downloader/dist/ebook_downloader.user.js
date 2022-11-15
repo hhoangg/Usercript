@@ -12,6 +12,7 @@
 // @homepage        https://openuserjs.org/scripts/va4ok
 // @include         https://truyenyy.vip/truyen/*/
 // @include         https://ztruyen.vn/truyen/*
+// @include         https://truyenhdx.com/truyen/*/
 // @run-at          document-end
 // @inject-into     auto
 // @description:vi  Tải sách từ nhiều nguồn định dạng EPUB.
@@ -24,6 +25,8 @@
 // @require         https://unpkg.com/animejs@3.2.1/lib/anime.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js
 // @require         https://unpkg.com/dexie@3.2.2/dist/dexie.min.js
+// @require         https://unpkg.com/axios@1.1.3/dist/axios.min.js
+// @require         https://unpkg.com/localforage@1.10.0/dist/localforage.min.js
 // ==/UserScript==
 
 // src/utils.js
@@ -36,6 +39,211 @@ function createElementFromHTML(htmlString) {
   htmlString = htmlString.trim(); // Never return a text node of whitespace as the result
   template.innerHTML = htmlString;
   return template.content;
+}
+
+// src/constant.js
+const storageKey = {
+  coverBlob: 'coverBlob'
+}
+
+// lib/azhDb/azhTable.js
+class azhTable {
+  constructor(
+    args = {
+      db: null,
+      name: '',
+      columns: [],
+    }
+  ) {
+    if (!args.db) throw new Error('db not found in table');
+    if (!args.name) throw new Error('Table missing name');
+    if (!args.columns || !args.columns.length) throw new Error('Table column not defined.');
+    this.db = args.db;
+    this.name = args.name;
+    args.columns.forEach((column) => {
+      this.columns = {
+        ...this.columns,
+        [column.title]: {
+          defaultValue: column.defaultValue,
+        },
+      };
+    });
+    this.tableIndex = `${this.db.getDbName()}__${this.name}`;
+  }
+  db = null;
+  name = '';
+  columns = {};
+  dataValue = null;
+  tableIndex = '';
+
+  async _getAllKeyByName(name) {
+    const keys = await localforage.keys();
+    return keys.filter((key) => _.startsWith(key, name));
+  }
+
+  async getAllKeysTable() {
+    return this._getAllKeyByName(`${this.tableIndex}[`);
+  }
+
+  async createOrUpdate(args) {
+    if (!args.id) args.id = uniqid();
+    const dataStorage = {};
+    Object.keys(args).forEach((key) => {
+      if (this.columns[key]) {
+        dataStorage[key] = args[key];
+      }
+    });
+    // set default value
+    Object.keys(this.columns).forEach((key) => {
+      if (dataStorage[key] === undefined && this.columns[key].defaultValue !== undefined) {
+        dataStorage[key] = this.columns[key].defaultValue;
+      }
+    });
+    const isExist = await localforage.getItem(`${this.tableIndex}[${args.id}]`);
+    if (isExist) {
+      return this.update(
+        {
+          where: {
+            id: args.id,
+          },
+        },
+        dataStorage,
+        isExist
+      );
+    }
+    await localforage.setItem(`${this.tableIndex}[${args.id}]`, dataStorage);
+    return dataStorage;
+  }
+
+  async update(args, value, data) {
+    let currenData = data;
+    if (!data || !data.id) {
+      const findData = await this.findOne({
+        where: args.where,
+      });
+      currenData = {
+        ...findData,
+        ...currenData,
+      };
+    }
+    if (!currenData) return currenData;
+    await localforage.setItem(`${this.tableIndex}[${currenData.id}]`, {
+      ...currenData,
+      ...value,
+    });
+    return localforage.getItem(`${this.tableIndex}[${currenData.id}]`);
+  }
+
+  async bulkCreateOrUpdate(args) {
+    return Promise.all(args.map(this.createOrUpdate));
+  }
+
+  async findOne(
+    args = {
+      where: {},
+    }
+  ) {
+    this.dataValue = null;
+    const allKeyOnThisTable = await this.getAllKeysTable();
+    if (!allKeyOnThisTable.length) return this.dataValue;
+    switch (true) {
+      case !args || !args.where || !Object.keys(args.where).length:
+        if (allKeyOnThisTable[0]) {
+          this.dataValue = await localforage.getItem(allKeyOnThisTable[0]);
+        }
+        break;
+      case !!args.where && !!Object.keys(args.where).length:
+        if (typeof args.where.id !== undefined && args.where.id !== null) {
+          this.dataValue = await localforage.getItem(`${this.tableIndex}[${args.where.id}]`);
+        } else {
+          const allData = await Promise.all(allKeyOnThisTable.map(localforage.getItem));
+          this.dataValue = allData.find((item) => this._compareObject(item, args.where));
+        }
+        break;
+      default:
+        break;
+    }
+    return this.dataValue;
+  }
+
+  _compareObject(obj1, obj2) {
+    const keysObj2 = Object.keys(obj2);
+    for (const key2 of keysObj2) {
+      if (obj2[key2] != obj1[key2]) return false;
+    }
+    return true;
+  }
+
+  async findAll(
+    args = {
+      where: {},
+    }
+  ) {
+    this.dataValue = [];
+    const allKeyOnThisTable = await this.getAllKeysTable();
+    if (!allKeyOnThisTable.length) return this.dataValue;
+    switch (true) {
+      case !args || !args.where || !Object.keys(args.where).length:
+        this.dataValue = await Promise.all(allKeyOnThisTable.map((key) => localforage.getItem(key)));
+        break;
+      case !!args.where && !!Object.keys(args.where).length:
+        if (typeof args.where.id !== undefined && args.where.id !== null) {
+          if (_.isArray(args.where.id)) {
+            this.dataValue = await Promise.all(
+              args.where.id.map((id) => localforage.getItem(`${this.tableIndex}[${id}]`))
+            );
+          } else {
+            this.dataValue = [await localforage.getItem(`${this.tableIndex}[${args.where.id}]`)];
+          }
+        } else {
+          const allData = await Promise.all(allKeyOnThisTable.map(localforage.getItem));
+          this.dataValue = allData.filter((item) => this._compareObject(item, args.where));
+        }
+        break;
+      default:
+        break;
+    }
+    return this.dataValue;
+  }
+}
+
+// lib/azhDb/azhDb.js
+class azhDb {
+  constructor(dbName) {
+    this.dbName = dbName ? `azhDb-${dbName}` : 'azhDb';
+  }
+  models = {};
+  dbName = '';
+  async init(tables = []) {
+    const findDb = await localforage.getItem(this.dbName);
+    if (!findDb) {
+      await localforage.setItem(this.dbName, {
+        tables,
+      });
+      this._initTable(tables);
+    } else {
+      this._initTable(findDb.tables);
+    }
+    return this;
+  }
+  _initTable(tables) {
+    tables.forEach((table) => {
+      this.models[table.name] = new azhTable({
+        db: this,
+        name: table.name,
+        columns: table.columns,
+      });
+    });
+  }
+  getDbName() {
+    return this.dbName;
+  }
+  getModel(name) {
+    return this.models[name];
+  }
+  getModels() {
+    return this.models;
+  }
 }
 
 // src/models/base.js
@@ -58,7 +266,14 @@ class BaseModel {
     },
   };
   // check list method overwrite
-  _METHOD_OVERWRITE = ['init', 'getNextChapUrl', 'getContentOnChap', 'getTitleOnChap', 'getFirstChapUrl'];
+  _METHOD_OVERWRITE = [
+    'getChapterId',
+    'init',
+    'getNextChapUrl',
+    'getContentOnChap',
+    'getTitleOnChap',
+    'getFirstChapUrl',
+  ];
 
   jepub = new jEpub();
   // state
@@ -72,6 +287,7 @@ class BaseModel {
   ebookCover = '';
   ebookDesc = '';
   ebookType = [];
+  ebookStatus = 'release';
   host = location.host;
   referrer = location.protocol + '//' + this.host + this.pathname;
   ebookFilename = this.pathname.slice(8, -1) + '.epub';
@@ -79,7 +295,10 @@ class BaseModel {
   endChapter = 0;
   $btnDownload;
   $btnText;
+  ebookId;
   $btnProgress;
+  coverBlob;
+  db = new azhDb();
 
   getAreaBtn() {
     return document.body;
@@ -97,29 +316,186 @@ class BaseModel {
     area.insertAdjacentHTML(this.btnDownload.position, btn.outerHTML);
     return document.querySelector(`#${btn.id} ${this.btnDownload.actionTarget || ''}`);
   }
+  async createStory() {
+    const { Book } = this.db.getModels();
+    const book = await Book.findOne({
+      where: {
+        id: this.ebookId,
+      },
+    });
+    let dataStorage = {
+      id: this.ebookId,
+      name: this.ebookTitle,
+      author: this.ebookAuthor,
+      cover: this.coverBlob,
+      type: this.ebookType,
+      total_chap: this.endChapter,
+      status: this.ebookStatus,
+    };
+    if (book) {
+      dataStorage = {
+        ...book,
+        ...dataStorage,
+        ...(book.cover && {
+          cover: book.cover,
+        }),
+      };
+    }
+    return Book.createOrUpdate(dataStorage);
+  }
+
+  async _init() {
+    // init cover
+    this.init();
+    this.jepub
+      .init({
+        title: this.ebookTitle,
+        author: this.ebookAuthor,
+        publisher: this.host,
+        description: this.ebookDesc,
+        tags: this.ebookType,
+      })
+      .uuid(this.referrer)
+      .notes(this.credits);
+    this.db = await this.db.init([
+      {
+        name: 'Book',
+        columns: [
+          {
+            title: 'id',
+            defaultValue: 'Unknown',
+          },
+          {
+            title: 'name',
+            defaultValue: 'Unknown',
+          },
+          {
+            title: 'author',
+            defaultValue: 'Unknown',
+          },
+          {
+            title: 'cover',
+            defaultValue: null,
+          },
+          {
+            title: 'type',
+            defaultValue: [],
+          },
+          {
+            title: 'total_chap',
+            defaultValue: 0,
+          },
+          {
+            title: 'total_chap_downloaded',
+            defaultValue: 0,
+          },
+          {
+            title: 'status',
+            defaultValue: 'release',
+            // dataType: Enum('release', 'writing', 'stop'),
+          },
+          {
+            title: 'created_at',
+            defaultValue: new Date(),
+          },
+        ],
+      },
+      {
+        name: 'Chapter',
+        columns: [
+          {
+            title: 'id',
+            defaultValue: 'Unknown',
+            dataType: 'string',
+          },
+          {
+            title: 'title',
+            defaultValue: 'Unknown',
+            dataType: 'string',
+          },
+          {
+            title: 'content',
+            defaultValue: null,
+            dataType: 'string',
+          },
+          {
+            title: 'order',
+            defaultValue: 0,
+            dataType: 'number',
+          },
+          {
+            title: 'book_id',
+            defaultValue: null,
+            dataType: 'string',
+          },
+        ],
+      },
+    ]);
+    const book = await this.createStory();
+    if (book.cover && !this.coverBlob) this._setCoverBlob(book.cover);
+  }
+
+  _updateStory(data) {
+    const { Book } = this.db.getModels();
+    return Book.update(
+      {
+        where: {
+          id: this.ebookId,
+        },
+      },
+      data
+    );
+  }
+
+  _createChapter(data) {
+    const { Chapter } = this.db.getModels();
+    return Chapter.createOrUpdate(data);
+  }
+
+  _getChapterById(id) {
+    const { Chapter } = this.db.getModels();
+    return Chapter.findOne({
+      where: {
+        id,
+      },
+    });
+  }
+
+  async _setCoverBlob(blob) {
+    await this._updateStory({
+      cover: blob,
+    });
+    this.coverBlob = blob;
+    this.jepub.cover(blob);
+  }
+
+  async _setEbookCover(coverUrl) {
+    this.ebookCover = coverUrl;
+    const coverBlob = await this._downloadCover();
+    await this._setCoverBlob(coverBlob);
+  }
+
   _addChap(chapterData = { content: '', title: '' }) {
     this.jepub.add(chapterData.title, chapterData.content);
   }
+
   async _getChap(url) {
     if (url) {
-      return new Promise((rs, onerror) => {
-        GM.xmlHttpRequest({
-          method: 'GET',
-          url,
-          onload: (res) => {
-            return rs(res.response.match(/<main.*?>([\s\S]*)<\/main>/)[1]);
-          },
-          onerror,
-        });
+      const res = await axios({
+        method: 'GET',
+        url,
       });
+      return res.data.match(/<body.*?>([\s\S]*)<\/body>/)[1];
     }
 
     return null;
   }
+
   _updateBtnProgress(percent) {
     if (!this.$btnProgress) this.$btnProgress = this.$btnDownload.querySelector(this.btnDownload.className.progress);
     this.$btnProgress.style.width = `${percent}%`;
   }
+
   _updateBtnText(str) {
     if (!this.$btnText) this.$btnText = this.$btnDownload.querySelector(this.btnDownload.className.text);
     this.$btnText.textContent = str;
@@ -141,36 +517,57 @@ class BaseModel {
   }
   _onDownload = async () => {
     let currentChap;
+    const customCover = prompt('You want to custom cover?');
+    if (customCover) await this._setEbookCover(customCover);
+
+    let chapUrl = this.getFirstChapUrl();
     for (let chapterIndex = 1; chapterIndex <= this.endChapter; chapterIndex++) {
-      let chapUrl = this.getFirstChapUrl();
       if (chapterIndex !== 1 && currentChap) {
         chapUrl = this.getNextChapUrl(currentChap);
       }
-      let dataChap = await this._getChap(chapUrl);
-      currentChap = createElementFromHTML(dataChap);
-      const chapContent = this.getContentOnChap(currentChap);
+
+      const chapterId = this.getChapterId(chapUrl);
+      const chapterExist = await this._getChapterById(chapterId);
+      const chapterData = {
+        ...chapterExist,
+        id: chapterId,
+        order: chapterIndex,
+        book_id: this.ebookId,
+      };
+      if (!chapterExist) {
+        let dataChap = await this._getChap(chapUrl);
+        chapterData.content = dataChap;
+      }
+      currentChap = createElementFromHTML(chapterData.content);
       const chapTitle = this.getTitleOnChap(currentChap);
+      const chapContent = this.getContentOnChap(currentChap);
       this._addChap({
         content: chapContent,
         title: chapTitle,
       });
+      await this._createChapter({
+        ...chapterData,
+        title: chapTitle,
+        id: chapterId,
+        order: chapterIndex,
+        book_id: this.ebookId,
+      });
       const percent = (chapterIndex / this.endChapter) * 100;
       this._updateBtnText(`${percent.toFixed(2)}%`);
       this._updateBtnProgress(percent);
-      await new Promise((rs) => setTimeout(rs, this.delayPerChap));
     }
     this._updateBtnText('Completed');
     this.$btnDownload.classList.add(this.btnDownload.className.completed.replace('.', ''));
     this.$btnDownload.removeEventListener('click', this._onDownload);
-    await this._genEbook();
+    return this._genEbook();
   };
 
   // internal function
-  raiseMissingMethod(methodName = '') {
+  _raiseMissingMethod(methodName = '') {
     throw new Error(`Method ${methodName} not found, plz make this method on your model.`);
   }
 
-  _importCover() {
+  _downloadCover() {
     if (!this.ebookCover) return;
     return new Promise((rs, rj) => {
       GM.xmlHttpRequest({
@@ -180,7 +577,7 @@ class BaseModel {
         onload: (response) => {
           try {
             this.jepub.cover(response.response);
-            return rs(this.jepub);
+            return rs(response.response);
           } catch (err) {
             return rj(err);
           }
@@ -191,26 +588,18 @@ class BaseModel {
   }
   // main function
   async run() {
+    // document.body.style.display = 'none';
     // raise and stop function when missing method
     for (const method of this._METHOD_OVERWRITE) {
       if (!this[method]) {
-        throw this.raiseMissingMethod(method);
+        throw this._raiseMissingMethod(method);
       }
     }
-    this.init();
-
-    this.jepub
-      .init({
-        title: this.ebookTitle,
-        author: this.ebookAuthor,
-        publisher: this.host,
-        description: this.ebookDesc,
-        tags: this.ebookType,
-      })
-      .uuid(this.referrer)
-      .notes(this.credits);
-    await this._importCover();
-
+    await this._init();
+    if (!this.coverBlob) {
+      const coverBlob = await this._downloadCover();
+      await this._setCoverBlob(coverBlob);
+    }
     this.$btnDownload = this.addBtnToArea();
     this.$btnDownload.addEventListener('click', this._onDownload);
   }
@@ -221,6 +610,7 @@ const downloadButtonHTML = `
 <div class="azh-btn-download">
   <div class="azh-download-progress"></div>
   <div class="azh-download-text">Download</div>
+  <div class="azh-download-progress-per-item"></div>
 </div>`;
 
 // src/modules/download-button.js
@@ -232,6 +622,11 @@ function downloadButton() {
 }
 
 // src/models/ztruyen.js
+// import { azhDb } from '../../lib/azhDb/azhDb';
+
+
+
+
 class Ztruyen extends BaseModel {
   makeBtnDownload = downloadButton;
 
@@ -249,10 +644,12 @@ class Ztruyen extends BaseModel {
     document.querySelector('.detail-story .content-story > p').remove();
     this.ebookDesc = document.querySelector('.detail-story .content-story').textContent.trim();
     this.ebookType = [...this.selectValueByAttr('Thể loại').querySelectorAll('a')].map((item) =>
-      item.textContent.trim(),
+      item.textContent.trim()
     );
     this.ebookAuthor = this.selectValueByAttr('Tác giả').textContent.trim();
     this.endChapter = Number(this.selectValueByAttr('Số chương').textContent.trim().replace(/\W/g, ''));
+    this.ebookId = this.pathname.split('/').slice(-1)[0];
+    this.ebookStatus = this.selectValueByAttr('Trạng thái').textContent.trim();
   }
 
   selectValueByAttr(attrName) {
@@ -275,6 +672,10 @@ class Ztruyen extends BaseModel {
     return [...chap.querySelectorAll('.content-block')].map((item) => item.outerHTML).join('\n');
   }
 
+  getChapterId(url) {
+    return url.split('/').slice(-1)[0];
+  }
+
   getTitleOnChap(chap) {
     return chap.querySelector('.title-chapter').textContent.trim();
   }
@@ -284,11 +685,86 @@ class Ztruyen extends BaseModel {
   }
 }
 
+// src/models/truyenhdx.js
+class HdxTruyen extends BaseModel {
+  makeBtnDownload = downloadButton;
+
+  init() {
+    this.btnDownload.position = 'afterbegin';
+    this.credits =
+      '<p>Truyện được tải từ <a href="' +
+      this.referrer +
+      '">TruyenHdx</a></p><p>Userscript được viết bởi: <a href="https://azhoang.github.io/">azHoang</a></p>';
+
+    this.ebookTitle = this.pageName.split('-')[0].trim();
+    this.ebookCover = document.querySelector('.book3dcenter > .book3d > img').dataset.src;
+    this.ebookDesc = document.querySelector('#gioi_thieu .gioi_thieu').textContent.trim();
+    this.ebookType = this.pageName.split('-').slice(-1);
+    this.ebookAuthor = this.pageName.split('-')[1].trim();
+    this.endChapter = Number(
+      document
+        .querySelector('#newchap .listchap li')
+        .textContent.trim()
+        .match(/Chương( ?\d+ ?)/gm)[0]
+        .match(/\d+/)[0]
+    );
+    this.ebookId = this.pathname.split('/').slice(-2)[0];
+    // this.ebookStatus = document.querySelector('#thong_tin .text-success').textContent.trim();
+  }
+
+  getAreaBtn() {
+    return document.querySelector('.book3dcenter');
+    // return document.querySelector('#truyen_button');
+  }
+
+  getNextChapUrl(chap) {
+    const next = [...chap.querySelectorAll('.next-chap')].slice(-1)[0].querySelector('a');
+    if (next) {
+      return next.getAttribute('href');
+    }
+    return null;
+  }
+
+  getContentOnChap(chap) {
+    return chap.querySelector('.container.cpt.truyen .reading').innerHTML.trim();
+  }
+
+  getChapterId(url) {
+    console.log(url);
+    return url.split('/').slice(-2)[0];
+  }
+
+  getTitleOnChap(chap) {
+    return chap.querySelector('.container.cpt.truyen .text-center:nth-child(2)').textContent.trim();
+  }
+
+  getFirstChapUrl() {
+    const elementFirstChap = document.querySelector('#dsc .listchap li a');
+    const indexFirstChap = Number(elementFirstChap.textContent
+      .trim()
+      .match(/Chương( ?\d+ ?)/gm)[0]
+      .match(/\d+/)[0]);
+    if(indexFirstChap === 0){
+      this.endChapter += 1;
+    }
+    console.log(this.endChapter);
+    return elementFirstChap.getAttribute('href');
+  }
+}
+
 // main.js
 (function () {
   'use strict';
-  const ebookModel = new Ztruyen();
-  if(!ebookModel.run) throw new Error('"run" funtion not defined.')
+  const hostMappingEbook = {
+    'ztruyen.vn': Ztruyen,
+    'truyenhdx.com': HdxTruyen,
+  };
+  if (!hostMappingEbook[window.location.host]) {
+    alert('We not support this Ebook site. plz contact https://azhoang.github.io/');
+    return window.open('https://azhoang.github.io/');
+  }
+  const ebookModel = new hostMappingEbook[window.location.host]();
+  if (!ebookModel.run) throw new Error('"run" funtion not defined.');
   ebookModel.run();
 })();
 
@@ -301,10 +777,17 @@ class Ztruyen extends BaseModel {
   --primary: #d8baf0;
   --success: #baf0c6;
   --bg: #2c3436;
-  --bg-progress: #71777d;
+  --bg-progress: linear-gradient(90deg, rgba(44, 52, 54, 1) 0%, rgba(9, 121, 70, 1) 49%, rgba(0, 255, 151, 1) 100%);
+  --bg-progress-item: linear-gradient(
+    90deg,
+    rgba(44, 54, 45, 1) 0%,
+    rgba(93, 121, 9, 1) 49%,
+    rgba(255, 186, 0, 1) 100%
+  );
 }
 /* Button */
 .azh-btn-download {
+  display: block!important;
   background: var(--bg);
   width: 200px;
   position: relative;
@@ -326,7 +809,7 @@ class Ztruyen extends BaseModel {
 }
 .azh-download-progress {
   height: 100%;
-  background-color: var(--bg-progress);
+  background: var(--bg-progress);
   position: absolute;
   top: 0;
   left: 0;
@@ -337,6 +820,13 @@ class Ztruyen extends BaseModel {
   color: var(--success);
   /* border-color: var(--success); */
   /* cursor: not-allowed; */
+}
+.azh-download-progress-per-item {
+  height: 3px;
+  background: var(--bg-progress-item);
+  position: absolute;
+  left: 0;
+  bottom: 0;
 }
 
 /* src/styles/ztruyen-download-button.css */
@@ -372,6 +862,14 @@ class Ztruyen extends BaseModel {
 /* Button Complete */
 .azh-download-completed {
   color: var(--success);
+}
+
+/* src/styles/truyenhdx-download-button.css */
+.azh-btn-download {
+  width: 180px;
+  border-radius: 5px;
+  margin-bottom: 1rem;
+  margin-left: 0;
 }
 `;
 

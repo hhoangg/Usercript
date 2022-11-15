@@ -1,5 +1,6 @@
 import { BaseModel } from './base';
-import { downloadButton, buttonLoaded } from '../modules/download-button';
+import { downloadButton } from '../modules/download-button';
+// import { azhDb } from '../../lib/azhDb/azhDb';
 
 import '../styles/ztruyen-download-button.css';
 import { selectByXpath } from '../utils';
@@ -21,10 +22,12 @@ export class Ztruyen extends BaseModel {
     document.querySelector('.detail-story .content-story > p').remove();
     this.ebookDesc = document.querySelector('.detail-story .content-story').textContent.trim();
     this.ebookType = [...this.selectValueByAttr('Thể loại').querySelectorAll('a')].map((item) =>
-      item.textContent.trim(),
+      item.textContent.trim()
     );
     this.ebookAuthor = this.selectValueByAttr('Tác giả').textContent.trim();
     this.endChapter = Number(this.selectValueByAttr('Số chương').textContent.trim().replace(/\W/g, ''));
+    this.ebookId = this.pathname.split('/').slice(-1)[0];
+    this.ebookStatus = this.selectValueByAttr('Trạng thái').textContent.trim();
   }
 
   selectValueByAttr(attrName) {
@@ -45,6 +48,10 @@ export class Ztruyen extends BaseModel {
 
   getContentOnChap(chap) {
     return [...chap.querySelectorAll('.content-block')].map((item) => item.outerHTML).join('\n');
+  }
+
+  getChapterId(url) {
+    return url.split('/').slice(-1)[0];
   }
 
   getTitleOnChap(chap) {

@@ -11,7 +11,8 @@
     "release:bugfix": "userscript-builder --mode bugfix",
     "release:minor": "userscript-builder --mode minor",
     "release:major": "userscript-builder --mode major",
-    "dev": "yarn build && nodemon server.js --ignore dist/"
+    "dev": "yarn build && nodemon server.js --ignore dist/",
+    "minify": "minify dist/ebook_downloader.user.js > dist/ebook_downloader.user.min.js"
   },
   "userscript": {
     "entry": "./main.js",
@@ -25,7 +26,8 @@
       "homepage": "https://openuserjs.org/scripts/va4ok",
       "include": [
         "https://truyenyy.vip/truyen/*/",
-        "https://ztruyen.vn/truyen/*"
+        "https://ztruyen.vn/truyen/*",
+        "https://truyenhdx.com/truyen/*/"
       ],
       "run-at": "document-end",
       "inject-into": "auto",
@@ -43,12 +45,15 @@
         "https://raw.githubusercontent.com/adamhalasz/uniqid/master/UMD/uniqid.min.js",
         "https://unpkg.com/animejs@3.2.1/lib/anime.min.js",
         "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js",
-        "https://unpkg.com/dexie@3.2.2/dist/dexie.min.js"
+        "https://unpkg.com/dexie@3.2.2/dist/dexie.min.js",
+        "https://unpkg.com/axios@1.1.3/dist/axios.min.js",
+        "https://unpkg.com/localforage@1.10.0/dist/localforage.min.js"
       ]
     }
   },
   "devDependencies": {
     "express": "^4.18.2",
+    "minify": "^9.1.0",
     "nodemon": "^2.0.20",
     "userscript-builder": "^0.4.0"
   },
