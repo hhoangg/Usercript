@@ -1,0 +1,49 @@
+{
+  "name": "tienganh123",
+  "version": "2.2.0",
+  "description": "Download ebook from another website.",
+  "main": "main.js",
+  "repository": "https://github.com/hhoangg/Userscript",
+  "author": "hhoangg",
+  "license": "MIT",
+  "scripts": {
+    "build": "userscript-builder --mode dev",
+    "release:bugfix": "userscript-builder --mode bugfix",
+    "release:minor": "userscript-builder --mode minor",
+    "release:major": "userscript-builder --mode major",
+    "dev": "yarn build && nodemon server.js --ignore dist/",
+    "minify": "minify dist/tienganh123.user.js > dist/tienganh123.user.min.js"
+  },
+  "userscript": {
+    "entry": "./main.js",
+    "dev": "./dist",
+    "release": "./release",
+    "fileName": "tienganh123",
+    "meta": {
+      "icon": "https://i.imgur.com/XfmPoRg.png",
+      "name": "User script English 123",
+      "namespace": "http://tampermonkey.net/",
+      "homepage": "https://github.com/hhoangg",
+      "include": [
+        "https://www.tienganh123.com/*/*.html"
+      ],
+      "match": "https://www.tienganh123.com/*/*.html",
+      "run-at": "document-end",
+      "inject-into": "auto",
+      "grant": [
+        "GM_xmlhttpRequest"
+      ],
+      "description:vi": "Xem đáp án cho khách hoặc thành viên thường",
+      "description": "View answer for normal user"
+    }
+  },
+  "devDependencies": {
+    "express": "^4.18.2",
+    "minify": "^9.1.0",
+    "nodemon": "^2.0.20",
+    "userscript-builder": "^0.4.0"
+  },
+  "dependencies": {
+    "uniqid": "^5.4.0"
+  }
+}

@@ -1,10 +1,14 @@
 // ==UserScript==
 // @name            User script Ebook downloader
 // @namespace       http://tampermonkey.net/
-// @version         2.3.0
+// @version         2.5.0
 // @description     Download ebook from many sources (EPUB format).
 // @author          hhoangg
-// @match           http://*/*
+// @match           https://truyenyy.vip/truyen/*/
+// @match           https://ztruyen.vn/truyen/*
+// @match           https://truyenhdx.com/truyen/*/
+// @match           https://truyencom.com/*
+// @match           https://metruyenchu.vn/*
 // @grant           GM_xmlhttpRequest
 // @source          https://github.com/hhoangg/Userscript
 // @license         MIT
@@ -31,7 +35,6 @@
 // @require         https://unpkg.com/localforage@1.10.0/dist/localforage.min.js
 // ==/UserScript==
 
-// src/utils.js
 const selectByXpath = (xpath) => {
   return document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
 };
@@ -43,12 +46,10 @@ function createElementFromHTML(htmlString) {
   return template.content;
 }
 
-// src/constant.js
 const storageKey = {
   coverBlob: 'coverBlob'
 }
 
-// lib/azhDb/azhTable.js
 class azhTable {
   constructor(
     args = {
@@ -209,7 +210,6 @@ class azhTable {
   }
 }
 
-// lib/azhDb/azhDb.js
 class azhDb {
   constructor(dbName) {
     this.dbName = dbName ? `azhDb-${dbName}` : 'azhDb';
@@ -248,7 +248,6 @@ class azhDb {
   }
 }
 
-// src/models/base.js
 class BaseModel {
   constructor(payload = {}) {
     Object.keys(payload).forEach((key) => {
@@ -609,7 +608,6 @@ class BaseModel {
   }
 }
 
-// src/components/download-button.js
 const downloadButtonHTML = `
 <div class="azh-btn-download">
   <div class="azh-download-progress"></div>
@@ -617,7 +615,6 @@ const downloadButtonHTML = `
   <div class="azh-download-progress-per-item"></div>
 </div>`;
 
-// src/modules/download-button.js
 function downloadButton() {
   const button = document.createElement('div');
   button.classList.add('azh-theme-dark');
@@ -625,7 +622,6 @@ function downloadButton() {
   return button;
 }
 
-// src/models/ztruyen.js
 // import { azhDb } from '../../lib/azhDb/azhDb';
 
 
@@ -689,7 +685,6 @@ class Ztruyen extends BaseModel {
   }
 }
 
-// src/models/truyenhdx.js
 class HdxTruyen extends BaseModel {
   makeBtnDownload = downloadButton;
 
@@ -756,7 +751,6 @@ class HdxTruyen extends BaseModel {
   }
 }
 
-// src/models/truyencom.js
 class TruyenCom extends BaseModel {
   makeBtnDownload = downloadButton;
 
@@ -827,7 +821,6 @@ class TruyenCom extends BaseModel {
   }
 }
 
-// src/models/metruyenchu.js
 class MeTruyenChu extends BaseModel {
   makeBtnDownload = downloadButton;
 
@@ -903,7 +896,6 @@ class MeTruyenChu extends BaseModel {
   }
 }
 
-// main.js
 (function () {
   'use strict';
   const hostMappingEbook = {
@@ -921,12 +913,10 @@ class MeTruyenChu extends BaseModel {
   ebookModel.run();
 })();
 
-// CSS injection
 (function(){
   const $style = document.createElement('style');
 
-  $style.innerHTML = `/* src/styles/download-button.css */
-.azh-theme-dark {
+  $style.innerHTML = `.azh-theme-dark {
   --primary: #d8baf0;
   --success: #baf0c6;
   --bg: #2c3436;
@@ -982,7 +972,6 @@ class MeTruyenChu extends BaseModel {
   bottom: 0;
 }
 
-/* src/styles/ztruyen-download-button.css */
 .azh-theme-dark {
   --primary: #d8baf0;
   --success: #baf0c6;
@@ -1017,7 +1006,6 @@ class MeTruyenChu extends BaseModel {
   color: var(--success);
 }
 
-/* src/styles/truyenhdx-download-button.css */
 .azh-btn-download {
   width: 180px;
   border-radius: 5px;

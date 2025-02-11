@@ -352,7 +352,9 @@ export class BaseModel {
     await this._init();
     if (!this.coverBlob) {
       const coverBlob = await this._downloadCover();
-      await this._setCoverBlob(coverBlob);
+      if (coverBlob) {
+        await this._setCoverBlob(coverBlob);
+      }
     }
     this.$btnDownload = this.addBtnToArea();
     this.$btnDownload.addEventListener('click', this._onDownload);
